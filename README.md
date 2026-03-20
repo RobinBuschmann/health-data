@@ -1,15 +1,15 @@
 # Health Data
 
 Personal Health Record (PHR) aggregator built on FHIR. Ingests health data from
-Apple Health exports, maps them to FHIR resources, and stores them in a
-self-hosted [Medplum](https://www.medplum.com/) server. A React dashboard lets
-you upload exports and visualise your health data.
+Apple Health exports, maps them to FHIR resources, and stores them in
+[Medplum](https://www.medplum.com/). A React dashboard lets you upload exports
+and visualise your health data.
 
 ## Prerequisites
 
 - **Node.js** v22 or higher
 - **npm** v10 or higher
-- **Docker Desktop** — runs the Medplum FHIR server, Postgres, and Redis locally
+- **Medplum** — a Medplum account with OAuth client credentials; set them in `.env`
 
 ## Getting started
 
@@ -27,29 +27,17 @@ Copy `.env.example` to `.env` and fill in the values:
 cp .env.example .env
 ```
 
-| Variable                | Description                              | Default                      |
-| ----------------------- | ---------------------------------------- | ---------------------------- |
-| `MEDPLUM_BASE_URL`      | Medplum server URL                       | `http://localhost:8103/`     |
-| `MEDPLUM_CLIENT_ID`     | OAuth client ID (from Medplum admin)     | —                            |
-| `MEDPLUM_CLIENT_SECRET` | OAuth client secret (from Medplum admin) | —                            |
-| `API_PORT`              | Port for the API server                  | `3000`                       |
-| `API_URL`               | Full URL of the API server               | `http://localhost:$API_PORT` |
-| `WEB_PORT`              | Port for the web UI                      | `3001`                       |
-| `CORS_ORIGIN`           | Allowed CORS origin                      | `http://localhost:$WEB_PORT` |
+| Variable                | Description                                          | Default                      |
+| ----------------------- | ---------------------------------------------------- | ---------------------------- |
+| `MEDPLUM_BASE_URL`      | Medplum server URL                                   | —                            |
+| `MEDPLUM_CLIENT_ID`     | OAuth client ID (from **Project → Client Applications**) | —                        |
+| `MEDPLUM_CLIENT_SECRET` | OAuth client secret                                  | —                            |
+| `API_PORT`              | Port for the API server                              | `3000`                       |
+| `API_URL`               | Full URL of the API server                           | `http://localhost:$API_PORT` |
+| `WEB_PORT`              | Port for the web UI                                  | `3001`                       |
+| `CORS_ORIGIN`           | Allowed CORS origin                                  | `http://localhost:$WEB_PORT` |
 
-To generate `MEDPLUM_CLIENT_ID` and `MEDPLUM_CLIENT_SECRET`, start Medplum, open
-`http://localhost:8100`, create a project, then go to **Project → Client
-Applications**.
-
-**3. Start Medplum**
-
-```bash
-npm run medplum:up
-```
-
-The FHIR API is available at `http://localhost:8103/fhir/R4`.
-
-**4. Start dev servers**
+**3. Start dev servers**
 
 ```bash
 npm run dev
@@ -57,12 +45,6 @@ npm run dev
 
 - API: `http://localhost:3000`
 - Web UI: `http://localhost:3001`
-
-**Stop Medplum when done**
-
-```bash
-npm run medplum:down
-```
 
 ## Running tests
 
@@ -81,9 +63,9 @@ Data flow for an Apple Health import:
 1. User drops `export.zip` onto the upload zone in the dashboard.
 2. The web UI POSTs the file to `POST /apple-health/import`.
 3. The API extracts `export.xml` from the zip and streams it through a SAX parser.
-4. Each `<Me>` tag is mapped to a FHIR **Patient** resource; each `<Record>` tag
-   is mapped to a FHIR **Observation** with a LOINC code and written to Medplum
-   in batches of 100.
+4. The `<Me>` tag is used to create a FHIR **Patient** resource. Each `<Record>`
+   tag is filtered to the supported metric types, mapped to a FHIR **Observation**
+   with a LOINC code, and written to Medplum in batches of 100.
 5. On success the web UI refetches the patient list and updates the dashboard.
 
 ## Packages
@@ -132,10 +114,17 @@ This container is a proof of concept adapted from a side project. In a productio
 The import is a streaming pipeline to avoid loading potentially large exports into memory:
 
 ```
-zip stream → unzipper → XmlTagStream (SAX) → async generators → Medplum batch write
+zip stream → unzipper → XmlTagStream → attachPatientRef → filterSupportedRecords → createObservations
 ```
 
-`XmlTagStream` is a Node.js `Transform` stream that emits typed objects for matching XML tags. Downstream async generators handle patient creation and observation batching (100 per request). The whole pipeline is wired with Node's `stream.pipeline` for correct back-pressure and cleanup.
+Each stage has a single responsibility:
+
+- **`XmlTagStream`** — Node.js `Transform` stream that uses a SAX parser to emit typed objects for `<Me>` and `<Record>` tags
+- **`attachPatientRef`** — creates the FHIR Patient from `<Me>`, enforces ordering (throws if a Record appears before Me), and attaches the patient reference to every Record
+- **`filterSupportedRecords`** — drops Record tags whose type is not in the supported metrics allowlist
+- **`createObservations`** — maps remaining records to FHIR Observations and writes them to Medplum in batches of 100
+
+The whole pipeline is wired with Node's `stream.pipeline` for correct back-pressure and cleanup.
 
 ### FHIR as the storage model
 
@@ -158,8 +147,6 @@ These are known gaps that would need to be addressed before a production deploym
 **Observability** — Fastify's built-in logger is enabled but there is no structured log format, distributed tracing, or metrics. A production setup would add structured logging (e.g. Pino JSON), a tracing layer (e.g. OpenTelemetry), and health-check endpoints.
 
 **OpenAPI / Swagger docs** — Fastify with Zod can generate interactive API docs almost for free once `@fastify/swagger` is added (see API client generation above).
-
-**Containerisation** — there is no `Dockerfile` or Compose service for the API or web packages. Adding them would make the full stack (`api` + `web` + Medplum) startable with a single `docker compose up`.
 
 ## Tech stack
 
