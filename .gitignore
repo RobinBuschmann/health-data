@@ -1,0 +1,7 @@
+.idea/
+.claude/
+node_modules/
+dist/
+.env
+env.d.ts
+.DS_Store
