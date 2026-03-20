@@ -75,9 +75,8 @@ export const appleHealthImporterFactory = ({ medplum }: AppleHealthImporterOptio
 
   return {
     async import(zippedFileStream: Readable) {
-      const exportStream = zippedFileStream.pipe(unzipper.ParseOne(/export.xml/));
       await pipeline(
-        exportStream,
+        zippedFileStream.pipe(unzipper.ParseOne(/export.xml/)),
         new XmlTagStream(["Me", "Record"]),
         attachPatientRef,
         filterSupportedRecords,
