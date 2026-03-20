@@ -148,6 +148,8 @@ These are known gaps that would need to be addressed before a production deploym
 
 **OpenAPI / Swagger docs** — Fastify with Zod can generate interactive API docs almost for free once `@fastify/swagger` is added (see API client generation above).
 
+**HTTP error handling** — unhandled errors (database failures, third-party SDK errors) are returned to the client as-is, potentially leaking internal details. A proper error handler should distinguish between intentional error responses and unexpected errors, returning a generic 500 for the latter.
+
 ## Tech stack
 
 | Layer    | Key libraries                                                          |
