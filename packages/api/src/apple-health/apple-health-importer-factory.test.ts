@@ -7,6 +7,7 @@ import {
   appleHealthImporterFactory,
 } from "./apple-health-importer-factory.js";
 import { createMock } from "../common/testing/create-mock.js";
+import { appleHealthMapperFactory } from "./apple-health-mapper-factory.js";
 
 const fixture = (name: string) => createReadStream(join(import.meta.dirname, "__fixtures__", name));
 
@@ -26,7 +27,10 @@ beforeEach(() => {
     entry: [],
   });
 
-  appleHealthImporter = appleHealthImporterFactory({ medplum });
+  appleHealthImporter = appleHealthImporterFactory({
+    medplum,
+    appleHealthMapper: appleHealthMapperFactory(),
+  });
 });
 
 describe("given a Me tag", () => {

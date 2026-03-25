@@ -72,47 +72,51 @@ export interface AppleHealthMe {
   biologicalSex?: string;
 }
 
-export function isSupportedRecord(record: object): record is AppleHealthRecord {
-  return "type" in record && typeof record.type === "string" && record.type in HK_TO_LOINC;
-}
+export type AppleHealthMapperOptions = Record<never, never>;
+export type AppleHealthMapper = ReturnType<typeof appleHealthMapperFactory>;
 
-export function mapRecord(record: AppleHealthRecord, patientRef: string): Observation {
-  const mapping = HK_TO_LOINC[record.type];
+export const appleHealthMapperFactory = (_options: AppleHealthMapperOptions = {}) => ({
+  isSupportedRecord(record: object): record is AppleHealthRecord {
+    return "type" in record && typeof record.type === "string" && record.type in HK_TO_LOINC;
+  },
 
-  return {
-    resourceType: "Observation",
-    status: "final",
-    code: {
-      coding: [
-        {
-          system: "http://loinc.org",
-          code: mapping.code,
-          display: mapping.display,
-        },
-      ],
-    },
-    subject: { reference: patientRef },
-    effectiveDateTime: new Date(record.startDate).toISOString(),
-    valueQuantity: {
-      value: parseFloat(record.value),
-      unit: record.unit,
-      system: "http://unitsofmeasure.org",
-      code: mapping.ucumUnit,
-    },
-  };
-}
+  mapRecord(record: AppleHealthRecord, patientRef: string): Observation {
+    const mapping = HK_TO_LOINC[record.type];
+    return {
+      resourceType: "Observation",
+      status: "final",
+      code: {
+        coding: [
+          {
+            system: "http://loinc.org",
+            code: mapping.code,
+            display: mapping.display,
+          },
+        ],
+      },
+      subject: { reference: patientRef },
+      effectiveDateTime: new Date(record.startDate).toISOString(),
+      valueQuantity: {
+        value: parseFloat(record.value),
+        unit: record.unit,
+        system: "http://unitsofmeasure.org",
+        code: mapping.ucumUnit,
+      },
+    };
+  },
 
-export function mapPatient(me: AppleHealthMe): Patient {
-  return {
-    resourceType: "Patient",
-    ...(me.dateOfBirth && { birthDate: me.dateOfBirth }),
-    ...(me.biologicalSex && {
-      gender:
-        me.biologicalSex === "HKBiologicalSexMale"
-          ? "male"
-          : me.biologicalSex === "HKBiologicalSexFemale"
-            ? "female"
-            : "unknown",
-    }),
-  };
-}
+  mapPatient(me: AppleHealthMe): Patient {
+    return {
+      resourceType: "Patient",
+      ...(me.dateOfBirth && { birthDate: me.dateOfBirth }),
+      ...(me.biologicalSex && {
+        gender:
+          me.biologicalSex === "HKBiologicalSexMale"
+            ? "male"
+            : me.biologicalSex === "HKBiologicalSexFemale"
+              ? "female"
+              : "unknown",
+      }),
+    };
+  },
+});

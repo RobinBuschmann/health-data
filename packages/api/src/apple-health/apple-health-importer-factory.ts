@@ -3,24 +3,23 @@ import unzipper from "unzipper";
 import { MedplumClient } from "@medplum/core";
 import type { BundleEntry, Observation } from "@medplum/fhirtypes";
 import { type XmlTag, XmlTagStream } from "../common/streams/xml-tag-stream.js";
-import {
-  AppleHealthRecord,
-  isSupportedRecord,
-  mapPatient,
-  mapRecord,
-} from "./apple-health-mapper.js";
+import { AppleHealthMapper, AppleHealthRecord } from "./apple-health-mapper-factory.js";
 import type { Readable } from "node:stream";
 import { inBatchesOf } from "../common/streams/in-batches-of.js";
 
 export type AppleHealthImporterOptions = {
   medplum: MedplumClient;
+  appleHealthMapper: AppleHealthMapper;
 };
 export type AppleHealthImporter = ReturnType<typeof appleHealthImporterFactory>;
 
-export const appleHealthImporterFactory = ({ medplum }: AppleHealthImporterOptions) => {
+export const appleHealthImporterFactory = ({
+  medplum,
+  appleHealthMapper,
+}: AppleHealthImporterOptions) => {
   async function createPatientRef(tag: XmlTag): Promise<string> {
     const patient = await medplum.createResource(
-      mapPatient({
+      appleHealthMapper.mapPatient({
         dateOfBirth: tag.attributes.HKCharacteristicTypeIdentifierDateOfBirth,
         biologicalSex: tag.attributes.HKCharacteristicTypeIdentifierBiologicalSex,
       }),
@@ -47,7 +46,7 @@ export const appleHealthImporterFactory = ({ medplum }: AppleHealthImporterOptio
     source: AsyncIterable<RecordWithPatientRef>,
   ): AsyncGenerator<RecordWithPatientRef> {
     for await (const item of source) {
-      if (isSupportedRecord(item.tag.attributes)) yield item;
+      if (appleHealthMapper.isSupportedRecord(item.tag.attributes)) yield item;
     }
   }
 
@@ -55,7 +54,7 @@ export const appleHealthImporterFactory = ({ medplum }: AppleHealthImporterOptio
     const batchSize = 100;
     for await (const batch of inBatchesOf(source, batchSize)) {
       await executeObservationsBatch(
-        batch.map(({ tag, patientRef }) => mapRecord(tag.attributes, patientRef)),
+        batch.map(({ tag, patientRef }) => appleHealthMapper.mapRecord(tag.attributes, patientRef)),
       );
     }
   }

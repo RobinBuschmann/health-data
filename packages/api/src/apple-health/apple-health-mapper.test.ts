@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Observation, Patient } from "@medplum/fhirtypes";
-import { isSupportedRecord, mapPatient, mapRecord } from "./apple-health-mapper.js";
+import { appleHealthMapperFactory } from "./apple-health-mapper-factory.js";
+
+const { isSupportedRecord, mapPatient, mapRecord } = appleHealthMapperFactory();
 
 describe("isSupportedRecord", () => {
   describe("given an object with a known HK type", () => {
