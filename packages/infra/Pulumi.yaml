@@ -1,0 +1,6 @@
+name: health-data
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Health Data infrastructure
